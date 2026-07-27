@@ -39,46 +39,78 @@ python -m venv venv
 source venv/bin/activate   # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-The server runs at http://localhost:8000. The ML model loads automatically on startup.
-Frontend (React Native / Expo)
-Bash
+
+```
+
+*The server runs at `http://localhost:8000`. The ML model loads automatically on startup.*
+
+### Frontend (React Native / Expo)
+
+```bash
 cd frontend
 npm install
 npx expo start
-Scan the QR code with Expo Go on your phone, or press i for iOS simulator / a for Android emulator.
-Environment Variables
-Create a .env file in the backend root (optional):
-Code snippet
+
+```
+
+*Scan the QR code with Expo Go on your phone, or press `i` for iOS simulator / `a` for Android emulator.*
+
+### Environment Variables
+
+Create a `.env` file in the backend root (optional):
+
+```env
 # backend/.env
 MIN_CONFIDENCE=0.5
 MAX_VIDEO_SIZE_MB=20
-🔌 API Endpoints
-POST /analyze-json – Upload a base64-encoded video (JSON) → returns risk analysis.
-POST /analyze – Multipart video upload (alternative, but not recommended for iOS).
-GET /health – Health check; reports if ML engine is available.
-POST /analyze/compare – Compare ML vs rule-based outputs (debugging).
-Example JSON payload:
-JSON
+
+```
+
+## 🔌 API Endpoints
+
+* `POST /analyze-json` – Upload a base64-encoded video (JSON) → returns risk analysis.
+* `POST /analyze` – Multipart video upload (alternative, but not recommended for iOS).
+* `GET /health` – Health check; reports if ML engine is available.
+* `POST /analyze/compare` – Compare ML vs rule-based outputs (debugging).
+
+**Example JSON payload:**
+
+```json
 {
   "file": "base64_encoded_video_string",
   "filename": "serve.mp4",
   "type": "video/mp4"
 }
-📊 Dataset & Training
-The ML model was trained on the Tennis Player Actions Dataset (Kaggle), which contains 2,000 images of forehand, backhand, serve, and ready positions. We extracted 7 joint angles per image and labelled them with our rule-based risk engine, then trained a RandomForest classifier achieving ~96% test accuracy.
-To extend the model, you can use the THETIS dataset (8,374 video sequences) with 3D skeleton data – ideal for more advanced time-series models (LSTM / Transformers).
-🤝 Contributing
+
+```
+
+## 📊 Dataset & Training
+
+The ML model was trained on the **Tennis Player Actions Dataset** ([Kaggle](https://www.kaggle.com/datasets/orvile/tennis-player-actions-dataset)), which contains 2,000 images of forehand, backhand, serve, and ready positions. We extracted 7 joint angles per image and labelled them with our rule-based risk engine, then trained a RandomForest classifier achieving **~96% test accuracy**.
+
+To extend the model, you can use the **THETIS dataset** (8,374 video sequences) with 3D skeleton data – ideal for more advanced time-series models (LSTM / Transformers).
+
+## 🤝 Contributing
+
 We welcome contributions! Please follow standard GitHub flow:
-Fork the repository
-Create a feature branch
-Commit your changes
-Open a pull request
-For major changes, please open an issue first to discuss what you would like to change.
-📄 License
-This project is licensed under the MIT License – see the LICENSE file for details.
-🙏 Acknowledgements
-MediaPipe – for seamless pose estimation.
-FastAPI – for the lightning-fast Python API.
-Scikit-learn – for the RandomForest classifier.
-Expo – for making React Native development a breeze.
-Tennis Player Actions Dataset – for providing the annotated images.
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Open a pull request
+
+*For major changes, please open an issue first to discuss what you would like to change.*
+
+## 📄 License
+
+This project is licensed under the **MIT License** – see the `LICENSE` file for details.
+
+## 🙏 Acknowledgements
+
+* [MediaPipe](https://google.github.io/mediapipe/) – for seamless pose estimation.
+* [FastAPI](https://fastapi.tiangolo.com/) – for the lightning-fast Python API.
+* [Scikit-learn](https://scikit-learn.org/) – for the RandomForest classifier.
+* [Expo](https://expo.dev/) – for making React Native development a breeze.
+* [Tennis Player Actions Dataset](https://www.kaggle.com/datasets/orvile/tennis-player-actions-dataset) – for providing the annotated images.
+
+---
