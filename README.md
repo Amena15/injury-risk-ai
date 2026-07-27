@@ -90,10 +90,14 @@
     p, li {
       color: #d1dce8;
     }
+    p {
+      margin-bottom: 1rem;
+    }
     a {
       color: #6da8ff;
       text-decoration: none;
       border-bottom: 1px dotted #3b6a9e;
+      transition: color 0.2s ease;
     }
     a:hover {
       color: #a8c9ff;
@@ -114,6 +118,7 @@
       overflow-x: auto;
       border: 1px solid #1d2a38;
       font-size: 0.85rem;
+      margin-bottom: 1.5rem;
     }
     pre code {
       background: transparent;
@@ -123,22 +128,26 @@
     }
     ul, ol {
       padding-left: 1.6rem;
-      margin: 0.6rem 0;
+      margin: 0.6rem 0 1.5rem 0;
     }
     li {
-      margin-bottom: 0.3rem;
+      margin-bottom: 0.4rem;
     }
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1.5rem;
-      margin: 1.2rem 0;
+      margin: 1.2rem 0 2rem 0;
     }
     .card {
       background: #0f1722;
       border-radius: 16px;
       padding: 1.2rem 1.5rem;
       border: 1px solid #1f2d3d;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
     }
     .card h4 {
       font-size: 1rem;
@@ -148,6 +157,12 @@
     .card p {
       font-size: 0.9rem;
       color: #9eb0c4;
+      margin-bottom: 0;
+    }
+    h3 {
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #e8edf5;
     }
     .footer {
       margin-top: 3rem;
@@ -175,7 +190,7 @@
 
   <!-- HEADER -->
   <h1>🏸 Injury Risk AI</h1>
-  <div class="subtitle">AI‑powered tennis injury prevention – analyze movement, predict risk, stay on court.</div>
+  <div class="subtitle">AI-powered tennis injury prevention – analyze movement, predict risk, stay on court.</div>
 
   <!-- BADGES -->
   <div class="badge-row">
@@ -185,7 +200,7 @@
     <span class="badge">🐍 FastAPI</span>
     <span class="badge">🧠 MediaPipe</span>
     <span class="badge">🏷️ TensorFlow Lite ready</span>
-    <span class="badge">🔄 Real‑time</span>
+    <span class="badge">🔄 Real-time</span>
   </div>
 
   <hr />
@@ -193,13 +208,13 @@
   <!-- DESCRIPTION -->
   <h2 class="section-title">📖 Overview</h2>
   <p>
-    <strong>Injury Risk AI</strong> is a mobile‑first wellness platform for tennis players.
+    <strong>Injury Risk AI</strong> is a mobile-first wellness platform for tennis players.
     Using your smartphone’s camera, it records a short video of your serve or stroke,
-    runs real‑time pose estimation to extract joint angles, and predicts your injury risk level
+    runs real-time pose estimation to extract joint angles, and predicts your injury risk level
     (Low / Moderate / High) using a trained machine learning model.
   </p>
   <p>
-    The app then gives you <strong>personalised corrective exercises</strong> and
+    The app then gives you <strong>personalized corrective exercises</strong> and
     highlights the <strong>specific biomechanical issues</strong> that may lead to
     common tennis injuries like tennis elbow, shoulder impingement, or knee stress.
   </p>
@@ -209,7 +224,7 @@
   <div class="grid-2">
     <div class="card">
       <h4>🎥 Video Capture</h4>
-      <p>Record 5–13 seconds of a tennis stroke using the built‑in camera, or upload from your gallery.</p>
+      <p>Record 5–13 seconds of a tennis stroke using the built-in camera, or upload from your gallery.</p>
     </div>
     <div class="card">
       <h4>🧍 Pose Estimation</h4>
@@ -228,20 +243,20 @@
       <p>Monitor your risk trend over time (future feature – ready for extension).</p>
     </div>
     <div class="card">
-      <h4>🔒 Privacy‑First</h4>
-      <p>Videos are processed on‑the‑fly and never stored – all analysis is temporary and local.</p>
+      <h4>🔒 Privacy-First</h4>
+      <p>Videos are processed on-the-fly and never stored – all analysis is temporary and local.</p>
     </div>
   </div>
 
   <!-- TECH STACK -->
   <h2 class="section-title">🛠️ Tech Stack</h2>
   <ul>
-    <li><strong>Frontend:</strong> React Native (Expo) – cross‑platform mobile app with a clean, dark theme.</li>
+    <li><strong>Frontend:</strong> React Native (Expo) – cross-platform mobile app with a clean, dark theme.</li>
     <li><strong>Backend:</strong> FastAPI (Python) – RESTful API serving the ML model and pose analysis.</li>
     <li><strong>Pose Estimation:</strong> MediaPipe (0.10.8) – classic <code>mp.solutions.pose</code> for fast landmark detection.</li>
-    <li><strong>ML Model:</strong> Scikit‑learn RandomForest – trained on joint‑angle features from the Tennis Player Actions dataset.</li>
+    <li><strong>ML Model:</strong> Scikit-learn RandomForest – trained on joint-angle features from the Tennis Player Actions dataset.</li>
     <li><strong>Video Upload:</strong> Base64 encoding (JSON) – bypasses iOS <code>FormData</code> issues, ensures reliability.</li>
-    <li><strong>Deployment:</strong> Docker‑ready (backend) + Expo EAS (mobile builds).</li>
+    <li><strong>Deployment:</strong> Docker-ready (backend) + Expo EAS (mobile builds).</li>
   </ul>
 
   <!-- INSTALLATION -->
@@ -269,10 +284,10 @@ MAX_VIDEO_SIZE_MB=20</code></pre>
   <!-- API ENDPOINTS -->
   <h2 class="section-title">🔌 API Endpoints</h2>
   <ul>
-    <li><code>POST /analyze-json</code> – Upload a base64‑encoded video (JSON) → returns risk analysis.</li>
+    <li><code>POST /analyze-json</code> – Upload a base64-encoded video (JSON) → returns risk analysis.</li>
     <li><code>POST /analyze</code> – Multipart video upload (alternative, but not recommended for iOS).</li>
     <li><code>GET /health</code> – Health check; reports if ML engine is available.</li>
-    <li><code>POST /analyze/compare</code> – Compare ML vs rule‑based outputs (debugging).</li>
+    <li><code>POST /analyze/compare</code> – Compare ML vs rule-based outputs (debugging).</li>
   </ul>
   <p><strong>Example JSON payload:</strong></p>
   <pre><code>{
@@ -287,25 +302,23 @@ MAX_VIDEO_SIZE_MB=20</code></pre>
     The ML model was trained on the <strong>Tennis Player Actions Dataset</strong>
     (<a href="https://www.kaggle.com/datasets/orvile/tennis-player-actions-dataset" target="_blank">Kaggle</a>),
     which contains 2,000 images of forehand, backhand, serve, and ready positions.
-    We extracted 7 joint angles per image and labelled them with our rule‑based risk engine,
+    We extracted 7 joint angles per image and labelled them with our rule-based risk engine,
     then trained a RandomForest classifier achieving <strong>~96% test accuracy</strong>.
   </p>
   <p>
     To extend the model, you can use the <strong>THETIS dataset</strong> (8,374 video sequences)
-    with 3D skeleton data – ideal for more advanced time‑series models (LSTM / Transformers).
+    with 3D skeleton data – ideal for more advanced time-series models (LSTM / Transformers).
   </p>
 
   <!-- CONTRIBUTING -->
   <h2 class="section-title">🤝 Contributing</h2>
-  <p>
-    We welcome contributions! Please follow standard GitHub flow:
-    <ol>
-      <li>Fork the repository</li>
-      <li>Create a feature branch</li>
-      <li>Commit your changes</li>
-      <li>Open a pull request</li>
-    </ol>
-  </p>
+  <p>We welcome contributions! Please follow standard GitHub flow:</p>
+  <ol>
+    <li>Fork the repository</li>
+    <li>Create a feature branch</li>
+    <li>Commit your changes</li>
+    <li>Open a pull request</li>
+  </ol>
   <p>For major changes, please open an issue first to discuss what you would like to change.</p>
 
   <!-- LICENSE -->
@@ -318,8 +331,8 @@ MAX_VIDEO_SIZE_MB=20</code></pre>
   <h2 class="section-title">🙏 Acknowledgements</h2>
   <ul>
     <li><a href="https://google.github.io/mediapipe/" target="_blank">MediaPipe</a> – for seamless pose estimation.</li>
-    <li><a href="https://fastapi.tiangolo.com/" target="_blank">FastAPI</a> – for the lightning‑fast Python API.</li>
-    <li><a href="https://scikit-learn.org/" target="_blank">Scikit‑learn</a> – for the RandomForest classifier.</li>
+    <li><a href="https://fastapi.tiangolo.com/" target="_blank">FastAPI</a> – for the lightning-fast Python API.</li>
+    <li><a href="https://scikit-learn.org/" target="_blank">Scikit-learn</a> – for the RandomForest classifier.</li>
     <li><a href="https://expo.dev/" target="_blank">Expo</a> – for making React Native development a breeze.</li>
     <li><a href="https://www.kaggle.com/datasets/orvile/tennis-player-actions-dataset" target="_blank">Tennis Player Actions Dataset</a> – for providing the annotated images.</li>
   </ul>
