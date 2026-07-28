@@ -8,15 +8,19 @@ Injury Risk AI records or uploads a short tennis stroke video, extracts pose lan
 
 ## Screenshots
 
-![Main dashboard](assets/mainDashboard.png)
+<p align="center">
+  <img src="assets/mainDashboard.png" alt="Main Dashboard" width="220"/>
+  <img src="assets/analysis1.png" alt="Analysis Screen 1" width="220"/>
+</p>
 
-![Analysis screen 1](assets/analysis1.png)
+<p align="center">
+  <img src="assets/analysis2.png" alt="Analysis Screen 2" width="220"/>
+  <img src="assets/analysis3.png" alt="Analysis Screen 3" width="220"/>
+</p>
 
-![Analysis screen 2](assets/analysis2.png)
-
-![Analysis screen 3](assets/analysis3.png)
-
-![Dataset analysis summary](assets/Dataset%20Analysis%20Summary.png)
+<p align="center">
+  <img src="assets/Dataset%20Analysis%20Summary.png" alt="Dataset Analysis Summary" width="750"/>
+</p>
 
 ## Key Features
 
