@@ -6,6 +6,18 @@ AI-powered tennis injury prevention with a FastAPI backend and an Expo mobile ap
 
 Injury Risk AI records or uploads a short tennis stroke video, extracts pose landmarks, computes joint angles, and returns a risk level with suggested corrective guidance. The app supports both a trained ML model and a rule-based fallback engine.
 
+## Screenshots
+
+![Main dashboard](assets/mainDashboard.png)
+
+![Analysis screen 1](assets/analysis1.png)
+
+![Analysis screen 2](assets/analysis2.png)
+
+![Analysis screen 3](assets/analysis3.png)
+
+![Dataset analysis summary](assets/Dataset%20Analysis%20Summary.png)
+
 ## Key Features
 
 - Video capture and upload from the mobile app
