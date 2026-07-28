@@ -1,3 +1,4 @@
+# backend/app/main.py
 import os
 import tempfile
 import shutil
@@ -7,11 +8,17 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from celery.result import AsyncResult
 from app.config import settings
 from app.pose_analyzer import PoseAnalyzer
 from app.risk_engine import RiskEngine
 from app.ml_risk_engine import MLRiskEngine
+from tasks import process_video_task
 import numpy as np
+
+from celery.result import AsyncResult
+
+
 
 # --- JSON payload model for base64 upload ---
 class VideoPayload(BaseModel):
@@ -163,30 +170,21 @@ async def analyze_video(file: UploadFile = File(...)):
 
     return result
 
-# --- NEW: /analyze-json endpoint for base64 JSON payload ---
+# --- Existing /analyze-json endpoint (synchronous base64) ---
 @app.post("/analyze-json")
 async def analyze_video_json(payload: VideoPayload):
     tmp_path = None
     try:
-        # Decode base64
         video_bytes = base64.b64decode(payload.file)
         if len(video_bytes) == 0:
             raise HTTPException(400, "Empty video file.")
-
-        # Save to temporary file
         suffix = os.path.splitext(payload.filename)[1] or ".mp4"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(video_bytes)
             tmp_path = tmp.name
 
-        # Skip compression for speed - use file directly
-        video_to_process = tmp_path
-
-        # Process with common logic
-        result = process_video_file(video_to_process)
-
+        result = process_video_file(tmp_path)
         return result
-
     except HTTPException:
         raise
     except base64.binascii.Error as e:
@@ -199,6 +197,32 @@ async def analyze_video_json(payload: VideoPayload):
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+# # --- NEW: Async endpoints for background processing ---
+# @app.post("/analyze-async")
+# async def start_analysis(payload: VideoPayload):
+#     """Submit a video for asynchronous processing."""
+#     task = process_video_task.delay(payload.file, payload.filename)
+#     return {
+#         "job_id": task.id,
+#         "status": "queued",
+#         "message": "Video submitted. Poll /job-status/{job_id} for results."
+#     }
+
+@app.get("/job-status/{job_id}")
+async def get_job_status(job_id: str):
+    """Get the status of an async job."""
+    task = AsyncResult(job_id, app=process_video_task)
+    if task.state == 'PENDING':
+        return {"status": "pending", "progress": 0}
+    elif task.state == 'STARTED':
+        return {"status": "processing", "progress": 50}
+    elif task.state == 'FAILURE':
+        return {"status": "failed", "error": str(task.info)}
+    elif task.state == 'SUCCESS':
+        return {"status": "success", "result": task.result}
+    else:
+        return {"status": task.state}
 
 # --- /analyze/compare (existing) ---
 @app.post("/analyze/compare")
@@ -265,3 +289,29 @@ async def health_check():
         "status": "ok",
         "ml_engine_available": MLRiskEngine.is_available(),
     }
+
+
+@app.post("/analyze-async")
+async def start_analysis(payload: VideoPayload):
+    """Submit a video for asynchronous processing."""
+    task = process_video_task.delay(payload.file, payload.filename)
+    return {
+        "job_id": task.id,
+        "status": "queued",
+        "message": "Video submitted. Poll /job-status/{job_id} for results."
+    }
+
+@app.get("/job-status/{job_id}")
+async def get_job_status(job_id: str):
+    """Get the status of an async job."""
+    task = AsyncResult(job_id, app=process_video_task)
+    if task.state == 'PENDING':
+        return {"status": "pending", "progress": 0}
+    elif task.state == 'STARTED':
+        return {"status": "processing", "progress": 50}
+    elif task.state == 'FAILURE':
+        return {"status": "failed", "error": str(task.info)}
+    elif task.state == 'SUCCESS':
+        return {"status": "success", "result": task.result}
+    else:
+        return {"status": task.state}

@@ -1,10 +1,12 @@
 # Injury Risk AI
 
-AI-powered tennis injury prevention with a FastAPI backend and an Expo mobile app.
+AI‑powered tennis injury prevention with a FastAPI backend, a React Native mobile app, and an **asynchronous Celery + Redis task pipeline** for real‑time video processing.
 
 ## Overview
 
-Injury Risk AI records or uploads a short tennis stroke video, extracts pose landmarks, computes joint angles, and returns a risk level with suggested corrective guidance. The app supports both a trained ML model and a rule-based fallback engine.
+Injury Risk AI records or uploads a short tennis stroke video, extracts pose landmarks, computes joint angles, and returns a risk level with corrective guidance. The app supports both a trained ML model and a rule‑based fallback engine.
+
+Processing is fully asynchronous: the frontend submits a job and polls for results – no timeouts, no stuck progress bars.
 
 ## Screenshots
 
@@ -25,23 +27,40 @@ Injury Risk AI records or uploads a short tennis stroke video, extracts pose lan
 ## Key Features
 
 - Video capture and upload from the mobile app
-- MediaPipe-based pose estimation and joint-angle extraction
-- ML risk prediction with rule-based fallback
+- MediaPipe‑based pose estimation and joint‑angle extraction
+- ML risk prediction (RandomForest) with rule‑based fallback
+- **Asynchronous background processing** with Celery + Redis – no timeouts
 - Risk score, flagged joint, risk factors, and recommendations
-- Temporary processing flow without storing uploaded videos
+- Temporary processing – uploaded videos are deleted after analysis
 
 ## Tech Stack
 
-- Frontend: React Native with Expo
-- Backend: FastAPI
-- Pose estimation: MediaPipe
-- ML model: scikit-learn RandomForest
+| Layer | Technology |
+| :--- | :--- |
+| Frontend | React Native + Expo |
+| Backend API | FastAPI (Python) |
+| Task Queue | Celery + Redis |
+| Pose Estimation | MediaPipe |
+| ML Model | scikit‑learn RandomForest |
+| Deployment | (local / cloud ready) |
 
 ## Project Structure
 
-- `backend/` FastAPI API, pose analysis, rule-based and ML risk engines
-- `frontend/` Expo/React Native mobile app
-- `Dataset/` local training dataset assets
+```
+injury-risk-ai/
+├── backend/
+│   ├── app/                # FastAPI app
+│   ├── celery_app.py       # Celery configuration
+│   ├── tasks.py            # Celery tasks (video processing)
+│   ├── risk_model.pkl      # Trained ML model
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   ├── .env
+│   └── package.json
+├── Dataset/                # Local training assets (ignored by Git)
+└── assets/                 # Screenshots for README
+```
 
 ## Backend Setup
 
@@ -52,6 +71,13 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Make sure **Redis** is installed (macOS):
+
+```bash
+brew install redis
+brew services start redis
+```
+
 ## Frontend Setup
 
 ```bash
@@ -59,17 +85,35 @@ cd frontend
 npm install
 ```
 
-Create `frontend/.env` with your Mac LAN IP:
+Create `frontend/.env` with your Mac LAN IP (the one that stays the same on Wi‑Fi):
 
 ```env
 EXPO_PUBLIC_API_URL=http://192.168.100.225:8000
 ```
 
-If your Wi-Fi changes, update the IP before starting Expo again.
+If your Wi‑Fi changes, update the IP before starting Expo again.
 
-## Run The Working Version
+## Run The Async Version (Four Services)
 
-Start the backend first:
+You need **four separate terminal windows** – keep all running.
+
+### 1. Redis (message broker)
+
+```bash
+brew services start redis
+```
+
+### 2. Celery Worker (processes videos)
+
+```bash
+cd backend
+source ./venv/bin/activate
+MEDIAPIPE_DISABLE_GPU=1 PYTHONPATH=. celery -A celery_app worker --loglevel=info --concurrency=1 --pool=solo
+```
+
+> The `--pool=solo` and `MEDIAPIPE_DISABLE_GPU=1` avoid MediaPipe fork‑related crashes on macOS.
+
+### 3. FastAPI Backend
 
 ```bash
 cd backend
@@ -77,31 +121,39 @@ source ./venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Check health:
-
-- Mac: `http://127.0.0.1:8000/health`
-- Phone on same Wi-Fi: `http://192.168.100.225:8000/health`
-
-Start the frontend:
+### 4. Expo Frontend
 
 ```bash
-npm --prefix /Users/amena/Desktop/injury-risk-ai/frontend run start -- --lan -c
+cd frontend
+npx expo start --lan -c
 ```
 
-If Expo asks to switch from port `8081` to `8082`, accept it.
+Scan the QR code with Expo Go (phone) or press `i`/`a` for simulators.
 
 ## API Endpoints
 
-- `POST /analyze-json` base64 video upload via JSON
-- `POST /analyze` multipart video upload
-- `POST /analyze/compare` compare ML vs rule-based output
-- `GET /health` health check and ML availability
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/analyze` | Multipart video upload (sync, fallback) |
+| `POST` | `/analyze-json` | Base64 video upload (sync) |
+| `POST` | `/analyze-async` | **Submit a video for async processing** – returns `job_id` |
+| `GET` | `/job-status/{job_id}` | Poll for job status and result |
+| `POST` | `/analyze/compare` | Compare ML vs rule‑based outputs (debug) |
+| `GET` | `/health` | Health check and ML availability |
+
+## How It Works (Async Flow)
+
+1. **Mobile app** records or picks a video → encodes as Base64.
+2. **`POST /analyze-async`** → FastAPI creates a Celery task and returns a `job_id` **instantly**.
+3. **Celery worker** processes the video (pose estimation → angles → risk prediction).
+4. **App polls** `GET /job-status/{job_id}` every 2 seconds until the result is ready.
+5. **Result appears** – no timeouts, no “stuck at 98%”.
 
 ## Model Notes
 
-- The backend loads `backend/risk_model.pkl` when available.
-- If the model artifact is incompatible with installed packages, the API falls back to the rule-based engine instead of crashing.
-- To regenerate the model with current dependencies:
+- The backend loads `backend/risk_model.pkl` if available.
+- If the model is missing or incompatible, it **falls back** to the rule‑based engine – no crashes.
+- To regenerate the model with your current dependencies:
 
 ```bash
 cd backend
@@ -111,11 +163,10 @@ python train_model.py
 
 ## Troubleshooting
 
-- `fetch failed: Could not connect to the server`
-  - Make sure the backend is running with `--host 0.0.0.0`
-  - Make sure the phone and Mac are on the same Wi-Fi
-  - Confirm `frontend/.env` points to the current Mac LAN IP
-- Expo starts from the wrong folder
-  - Use `npm --prefix /Users/amena/Desktop/injury-risk-ai/frontend run start -- --lan -c`
-- Model load error on backend startup
-  - Rebuild the model with `python train_model.py`
+| Problem | Solution |
+| :--- | :--- |
+| `fetch failed: Could not connect` | Backend running? Check IP in `.env`. Phone and Mac on same Wi‑Fi. |
+| Celery worker crashes with `SIGABRT` | Use `--pool=solo` and `MEDIAPIPE_DISABLE_GPU=1` (as shown above). |
+| Model load error on startup | Rebuild model with `python train_model.py`. |
+| Expo starts from wrong folder | Use the absolute path: `npm --prefix ~/Desktop/injury-risk-ai/frontend run start -- --lan -c`. |
+| All results are “High” | That’s expected for extreme form. Tune thresholds in `risk_engine.py` if needed. |

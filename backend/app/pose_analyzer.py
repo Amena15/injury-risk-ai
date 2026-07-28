@@ -68,22 +68,24 @@ class PoseAnalyzer:
         all_metrics = []
         frame_count = 0
         processed_frames = 0
-        max_frames = 50  # limit to 50 frames total (~1.5s of movement)
+        max_frames = 20  # reduced from 30 to 20
+        skip_frames = 15  # process every 15th frame
 
-        while cap.isOpened():
+        while cap.isOpened() and processed_frames < max_frames:
             ret, frame = cap.read()
             if not ret:
                 break
             frame_count += 1
-            # Process only every 5th frame
-            if frame_count % 5 != 0:
+            if frame_count % skip_frames != 0:
                 continue
-            metrics = self.process_frame(frame)
-            if metrics:
-                all_metrics.append(metrics)
-                processed_frames += 1
-            if processed_frames >= max_frames:
-                break
+            try:
+                metrics = self.process_frame(frame)
+                if metrics:
+                    all_metrics.append(metrics)
+                    processed_frames += 1
+            except Exception as e:
+                print(f"⚠️ Frame processing error: {e}")
+                continue
 
         cap.release()
         return all_metrics
