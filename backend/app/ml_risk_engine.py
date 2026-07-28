@@ -18,6 +18,7 @@ import joblib
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any
+from warnings import warn
 
 # Define the expected feature order (must match training)
 FEATURES = [
@@ -190,12 +191,24 @@ class MLRiskEngine:
             cls._model = None
             return False
         
-        model_data = joblib.load(model_path)
-        cls._model = model_data['model']
-        cls._label_encoder = model_data['label_encoder']
-        cls._feature_columns = model_data.get('feature_columns', FEATURES)
-        print(f"✅ ML model loaded from {model_path}")
-        return True
+        try:
+            model_data = joblib.load(model_path)
+            cls._model = model_data['model']
+            cls._label_encoder = model_data['label_encoder']
+            cls._feature_columns = model_data.get('feature_columns', FEATURES)
+            print(f"✅ ML model loaded from {model_path}")
+            return True
+        except Exception as exc:
+            # Keep API available even if serialized artifact is incompatible.
+            cls._model = None
+            cls._label_encoder = None
+            cls._feature_columns = FEATURES
+            warn(
+                f"ML model could not be loaded from {model_path}: {exc}. "
+                "Falling back to rule-based engine. "
+                "Re-train model with current dependencies via: python train_model.py"
+            )
+            return False
 
     @classmethod
     def is_available(cls) -> bool:
@@ -364,6 +377,3 @@ class MLRiskEngine:
         
         return risk_factors
 
-
-# Auto-load the model on import
-MLRiskEngine.load_model()

@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Injury Risk AI",
+    "slug": "injury-risk-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0E1620",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.amena.injuryriskai",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera access is needed to record tennis serves and strokes for injury risk analysis.",
+        "NSPhotoLibraryUsageDescription": "Photo library access is needed to upload videos for analysis."
+      }
+    },
+    "android": {
+      "package": "com.amena.injuryriskai",
+      "adaptiveIcon": {
+        "backgroundColor": "#0E1620",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera access is needed to record tennis serves and strokes for injury risk analysis."
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}

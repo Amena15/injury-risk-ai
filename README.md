@@ -1,116 +1,105 @@
-# 🏸 Injury Risk AI
+# Injury Risk AI
 
-> AI-powered tennis injury prevention – analyze movement, predict risk, stay on court.
+AI-powered tennis injury prevention with a FastAPI backend and an Expo mobile app.
 
-⚡ **Machine Learning** | 🎯 **Computer Vision** | 📱 **React Native** | 🐍 **FastAPI** | 🧠 **MediaPipe** | 🏷️ **TensorFlow Lite ready** | 🔄 **Real-time**
+## Overview
 
----
+Injury Risk AI records or uploads a short tennis stroke video, extracts pose landmarks, computes joint angles, and returns a risk level with suggested corrective guidance. The app supports both a trained ML model and a rule-based fallback engine.
 
-## 📖 Overview
+## Key Features
 
-**Injury Risk AI** is a mobile-first wellness platform for tennis players. Using your smartphone’s camera, it records a short video of your serve or stroke, runs real-time pose estimation to extract joint angles, and predicts your injury risk level (Low / Moderate / High) using a trained machine learning model.
+- Video capture and upload from the mobile app
+- MediaPipe-based pose estimation and joint-angle extraction
+- ML risk prediction with rule-based fallback
+- Risk score, flagged joint, risk factors, and recommendations
+- Temporary processing flow without storing uploaded videos
 
-The app then gives you **personalized corrective exercises** and highlights the **specific biomechanical issues** that may lead to common tennis injuries like tennis elbow, shoulder impingement, or knee stress.
+## Tech Stack
 
-## ✨ Key Features
+- Frontend: React Native with Expo
+- Backend: FastAPI
+- Pose estimation: MediaPipe
+- ML model: scikit-learn RandomForest
 
-*   **🎥 Video Capture:** Record 5–13 seconds of a tennis stroke using the built-in camera, or upload from your gallery.
-*   **🧍 Pose Estimation:** MediaPipe extracts 33 body landmarks, computing left/right elbow, knee, shoulder, and hip angles.
-*   **🤖 ML Risk Prediction:** Random Forest classifier (96% accuracy) trained on 260 annotated frames – predicts risk level instantly.
-*   **📊 Actionable Feedback:** Get detailed risk factors, a risk score (0–100), and tailored “prehab” exercises to correct your form.
-*   **📈 Progress Tracking:** Monitor your risk trend over time (future feature – ready for extension).
-*   **🔒 Privacy-First:** Videos are processed on-the-fly and never stored – all analysis is temporary and local.
+## Project Structure
 
-## 🛠️ Tech Stack
+- `backend/` FastAPI API, pose analysis, rule-based and ML risk engines
+- `frontend/` Expo/React Native mobile app
+- `Dataset/` local training dataset assets
 
-*   **Frontend:** React Native (Expo) – cross-platform mobile app with a clean, dark theme.
-*   **Backend:** FastAPI (Python) – RESTful API serving the ML model and pose analysis.
-*   **Pose Estimation:** MediaPipe (0.10.8) – classic `mp.solutions.pose` for fast landmark detection.
-*   **ML Model:** Scikit-learn RandomForest – trained on joint-angle features from the Tennis Player Actions dataset.
-*   **Video Upload:** Base64 encoding (JSON) – bypasses iOS `FormData` issues, ensures reliability.
-*   **Deployment:** Docker-ready (backend) + Expo EAS (mobile builds).
+## Backend Setup
 
-## 📦 Installation & Setup
-
-### Backend (FastAPI)
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate   # or `venv\Scripts\activate` on Windows
+python3 -m venv venv
+source ./venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
-
 ```
 
-*The server runs at `http://localhost:8000`. The ML model loads automatically on startup.*
-
-### Frontend (React Native / Expo)
+## Frontend Setup
 
 ```bash
 cd frontend
 npm install
-npx expo start
-
 ```
 
-*Scan the QR code with Expo Go on your phone, or press `i` for iOS simulator / `a` for Android emulator.*
-
-### Environment Variables
-
-Create a `.env` file in the backend root (optional):
+Create `frontend/.env` with your Mac LAN IP:
 
 ```env
-# backend/.env
-MIN_CONFIDENCE=0.5
-MAX_VIDEO_SIZE_MB=20
-
+EXPO_PUBLIC_API_URL=http://192.168.100.225:8000
 ```
 
-## 🔌 API Endpoints
+If your Wi-Fi changes, update the IP before starting Expo again.
 
-* `POST /analyze-json` – Upload a base64-encoded video (JSON) → returns risk analysis.
-* `POST /analyze` – Multipart video upload (alternative, but not recommended for iOS).
-* `GET /health` – Health check; reports if ML engine is available.
-* `POST /analyze/compare` – Compare ML vs rule-based outputs (debugging).
+## Run The Working Version
 
-**Example JSON payload:**
+Start the backend first:
 
-```json
-{
-  "file": "base64_encoded_video_string",
-  "filename": "serve.mp4",
-  "type": "video/mp4"
-}
-
+```bash
+cd backend
+source ./venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## 📊 Dataset & Training
+Check health:
 
-The ML model was trained on the **Tennis Player Actions Dataset** ([Kaggle](https://www.kaggle.com/datasets/orvile/tennis-player-actions-dataset)), which contains 2,000 images of forehand, backhand, serve, and ready positions. We extracted 7 joint angles per image and labelled them with our rule-based risk engine, then trained a RandomForest classifier achieving **~96% test accuracy**.
+- Mac: `http://127.0.0.1:8000/health`
+- Phone on same Wi-Fi: `http://192.168.100.225:8000/health`
 
-To extend the model, you can use the **THETIS dataset** (8,374 video sequences) with 3D skeleton data – ideal for more advanced time-series models (LSTM / Transformers).
+Start the frontend:
 
-## 🤝 Contributing
+```bash
+npm --prefix /Users/amena/Desktop/injury-risk-ai/frontend run start -- --lan -c
+```
 
-We welcome contributions! Please follow standard GitHub flow:
+If Expo asks to switch from port `8081` to `8082`, accept it.
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Open a pull request
+## API Endpoints
 
-*For major changes, please open an issue first to discuss what you would like to change.*
+- `POST /analyze-json` base64 video upload via JSON
+- `POST /analyze` multipart video upload
+- `POST /analyze/compare` compare ML vs rule-based output
+- `GET /health` health check and ML availability
 
-## 📄 License
+## Model Notes
 
-This project is licensed under the **MIT License** – see the `LICENSE` file for details.
+- The backend loads `backend/risk_model.pkl` when available.
+- If the model artifact is incompatible with installed packages, the API falls back to the rule-based engine instead of crashing.
+- To regenerate the model with current dependencies:
 
-## 🙏 Acknowledgements
+```bash
+cd backend
+source ./venv/bin/activate
+python train_model.py
+```
 
-* [MediaPipe](https://google.github.io/mediapipe/) – for seamless pose estimation.
-* [FastAPI](https://fastapi.tiangolo.com/) – for the lightning-fast Python API.
-* [Scikit-learn](https://scikit-learn.org/) – for the RandomForest classifier.
-* [Expo](https://expo.dev/) – for making React Native development a breeze.
-* [Tennis Player Actions Dataset](https://www.kaggle.com/datasets/orvile/tennis-player-actions-dataset) – for providing the annotated images.
+## Troubleshooting
 
----
+- `fetch failed: Could not connect to the server`
+  - Make sure the backend is running with `--host 0.0.0.0`
+  - Make sure the phone and Mac are on the same Wi-Fi
+  - Confirm `frontend/.env` points to the current Mac LAN IP
+- Expo starts from the wrong folder
+  - Use `npm --prefix /Users/amena/Desktop/injury-risk-ai/frontend run start -- --lan -c`
+- Model load error on backend startup
+  - Rebuild the model with `python train_model.py`
