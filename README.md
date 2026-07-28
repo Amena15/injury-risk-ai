@@ -15,9 +15,9 @@ Processing is fully asynchronous: the frontend submits a job and polls for resul
 </p>
 
 <p align="center">
-  <img src="assets/analysis2.png" alt="Analysis Screen 2" width="220"/>
   <img src="assets/analysis3.png" alt="Analysis Screen 3" width="220"/>
   <img src="assets/analysis1.png" alt="Analysis Screen 1" width="220"/>
+  <img src="assets/analysis2.png" alt="Analysis Screen 2" width="220"/>
 </p>
 
 <p align="center">
