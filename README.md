@@ -24,7 +24,7 @@ Processing is fully asynchronous: the frontend submits a job and polls for resul
   <img src="assets/Dataset%20Analysis%20Summary.png" alt="Dataset Analysis Summary" width="750"/>
 </p>
 
-## Key Features
+## Main Features
 
 - Video capture and upload from the mobile app
 - MediaPipe‑based pose estimation and joint‑angle extraction
