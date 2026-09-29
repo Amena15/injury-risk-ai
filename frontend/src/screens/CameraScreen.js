@@ -18,22 +18,22 @@ import TopBar from '../components/TopBar';
 import PrimaryButton from '../components/Button';
 import LoadingOverlay from '../components/LoadingOverlay';
 
+// -----------------------------------------------------------------------------
+// API URL detection – automatically finds the right host
+// -----------------------------------------------------------------------------
 const getApiUrl = () => {
-  // Allow explicit override from environment for reliability.
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl && envUrl.trim()) {
-    return `${envUrl.replace(/\/$/, '')}/analyze-json`;
+    return `${envUrl.replace(/\/$/, '')}`;
   }
 
   const extractHost = (raw) => {
     if (!raw || typeof raw !== 'string') return null;
-    // Handles values like "192.168.1.10:8081" and "exp://192.168.1.10:8081".
     const noScheme = raw.includes('://') ? raw.split('://')[1] : raw;
     const hostPart = noScheme.split('/')[0];
     return hostPart.split(':')[0] || null;
   };
 
-  // On a real device, derive the host from Expo's current dev host.
   const host =
     extractHost(Constants?.expoConfig?.hostUri) ||
     extractHost(Constants?.linkingUri) ||
@@ -41,15 +41,17 @@ const getApiUrl = () => {
     extractHost(Constants?.manifest?.debuggerHost);
 
   if (host) {
-    return `http://${host}:8000/analyze-json`;
+    return `http://${host}:8000`;
   }
 
-  // Fall back for local web/simulator workflows.
-  return 'http://127.0.0.1:8000/analyze-json';
+  return 'http://127.0.0.1:8000';
 };
 
-const API_URL = getApiUrl();
-const MAX_DURATION = 15; 
+const BASE_URL = getApiUrl();
+const API_URL_ASYNC = `${BASE_URL}/analyze-async`;
+const API_URL_STATUS = (jobId) => `${BASE_URL}/job-status/${jobId}`;
+
+const MAX_DURATION = 15;
 const MAX_UPLOAD_SIZE_MB = 25;
 
 const MONO_FONT = Platform.select({
@@ -171,7 +173,16 @@ export default function CameraScreen({ onNavigate }) {
   const cameraRef = useRef(null);
   const timerRef = useRef(null);
   const recordingCancelledRef = useRef(false);
+  const pollingIntervalRef = useRef(null);
 
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    };
+  }, []);
+
+  // ---------- Permissions ----------
   useEffect(() => {
     (async () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -181,6 +192,7 @@ export default function CameraScreen({ onNavigate }) {
     })();
   }, []);
 
+  // ---------- Recording timer ----------
   useEffect(() => {
     if (screenState === 'recording') {
       setRecSeconds(0);
@@ -193,6 +205,7 @@ export default function CameraScreen({ onNavigate }) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [screenState]);
 
+  // ---------- Auto-start recording ----------
   useEffect(() => {
     if (screenState === 'recording' && cameraReady && cameraRef.current) {
       cameraRef.current.recordAsync({ maxDuration: MAX_DURATION })
@@ -214,6 +227,7 @@ export default function CameraScreen({ onNavigate }) {
     }
   }, [screenState, cameraReady]);
 
+  // ---------- Analyze step progression (visual only) ----------
   useEffect(() => {
     if (screenState === 'analyzing') {
       const stepInterval = setInterval(() => {
@@ -225,6 +239,7 @@ export default function CameraScreen({ onNavigate }) {
     }
   }, [screenState]);
 
+  // ---------- Handlers ----------
   const onCameraReady = useCallback(() => setCameraReady(true), []);
 
   const handleRecord = () => {
@@ -245,6 +260,7 @@ export default function CameraScreen({ onNavigate }) {
     setIsLoading(false);
   };
 
+  // ---------- Upload from library ----------
   const handleUpload = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -271,7 +287,7 @@ export default function CameraScreen({ onNavigate }) {
     }
   };
 
-  // ---------- sendVideo using Base64 JSON (avoids FormData issues) ----------
+  // ---------- sendVideo – async with polling ----------
   const sendVideo = async (uri) => {
     try {
       const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
@@ -283,62 +299,72 @@ export default function CameraScreen({ onNavigate }) {
         );
       }
 
-      // 1. Read the video file as a Base64 string
+      // Read the video as base64 for the API task request.
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-
-      // 2. Get file name from URI
       const fileName = uri.split('/').pop() || 'video.mp4';
 
-      // 3. Create an AbortController with 420s timeout.
-      // Base64 uploads + server-side pose analysis can exceed 3 minutes on larger clips.
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000);
-
-      // 4. Send as JSON
-      const response = await fetch(API_URL, {
+      const submitRes = await fetch(API_URL_ASYNC, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          file: base64,
-          filename: fileName,
-          type: 'video/mp4',
-        }),
-        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: base64, filename: fileName, type: 'video/mp4' }),
       });
+      const submitData = await submitRes.json();
+      if (!submitRes.ok) throw new Error(submitData.detail || submitData.error || 'Failed to submit job');
+      const jobId = submitData.job_id;
+      if (!jobId) throw new Error('No job ID returned');
 
-      clearTimeout(timeoutId);
+      // 3. Start polling
+      let attempts = 0;
+      const maxAttempts = 120; // 120 * 2s = 4 minutes
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Analysis failed');
+      pollingIntervalRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const statusRes = await fetch(API_URL_STATUS(jobId));
+          const statusData = await statusRes.json();
 
-      // 5. Navigate to results
-      setScreenState('analyzing');
-      setTimeout(() => {
-        setIsLoading(false);
-        if (onNavigate) onNavigate('Results', { result: data });
-      }, 500);
+          if (statusData.status === 'success') {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+            setUploadProgress(100);
+            setScreenState('analyzing');
+            setTimeout(() => {
+              setIsLoading(false);
+              if (onNavigate) onNavigate('Results', { result: statusData.result });
+            }, 500);
+          } else if (statusData.status === 'failed') {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+            Alert.alert('Processing Failed', statusData.error || 'Unknown error');
+            setScreenState('idle');
+            setIsLoading(false);
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+            Alert.alert('Timeout', 'Processing is taking too long. Please try again.');
+            setScreenState('idle');
+            setIsLoading(false);
+          }
+        } catch (pollError) {
+          // Network transient – ignore, continue polling
+          console.warn('Poll error:', pollError);
+        }
+      }, 2000); // poll every 2 seconds
+
     } catch (error) {
-      if (error.name === 'AbortError') {
-        Alert.alert(
-          'Timeout',
-          'The request took too long. Please try a shorter clip (<= 15s), keep full body in frame, and retry on stable Wi-Fi.'
-        );
-      } else {
-        Alert.alert(
-          'Analysis Error',
-          `${error.message || 'Network error.'}\n\nEndpoint: ${API_URL}`
-        );
-      }
+      Alert.alert(
+        'Analysis Error',
+        `${error.message || 'Network error.'}\n\nEndpoint: ${API_URL_ASYNC}`
+      );
       setScreenState('idle');
       setIsLoading(false);
     }
   };
 
-  // ---------- Camera permission ----------
+  // ---------- Camera permission UI ----------
   if (!permission) {
     return <View style={{ flex: 1, backgroundColor: colors.ink }} />;
   }
@@ -360,6 +386,7 @@ export default function CameraScreen({ onNavigate }) {
     );
   }
 
+  // ---------- Render ----------
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
       {Platform.OS !== 'web' && (

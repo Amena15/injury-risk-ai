@@ -41,7 +41,7 @@ class RiskEngine:
                 max_factor_score = 30
                 flagged_joint = "left_elbow"
 
-        if metrics.get("right_elbow_angle", 180) < 140:
+        if metrics.get("right_elbow_angle", 180) < 130:  # was 140
             risk_factors.append({
                 "id": "right_elbow",
                 "title": "Right elbow overly flexed",
@@ -64,7 +64,7 @@ class RiskEngine:
                 max_factor_score = 25
                 flagged_joint = "left_knee"
 
-        if metrics.get("right_knee_angle", 180) < 80:
+        if metrics.get("right_knee_angle", 180) < 70:    # was 80
             risk_factors.append({
                 "id": "right_knee",
                 "title": "Right knee deep bend",

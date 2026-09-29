@@ -10,19 +10,21 @@ from app.risk_engine import RiskEngine
 @celery.task(bind=True)
 def process_video_task(self, base64_data, filename):
     """Background task to process a video and return risk analysis."""
+    tmp_path = None
+    analyzer = None
     try:
-        # 1. Decode and save video
         video_bytes = base64.b64decode(base64_data)
         suffix = os.path.splitext(filename)[1] or ".mp4"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(video_bytes)
             tmp_path = tmp.name
 
-        # 2. Process video
+        if not MLRiskEngine.is_available():
+            MLRiskEngine.load_model()
+
         analyzer = PoseAnalyzer()
         all_metrics = analyzer.process_video(tmp_path)
         if not all_metrics:
-            os.unlink(tmp_path)
             raise ValueError("No pose detected in the video.")
 
         avg_metrics = {}
@@ -57,8 +59,12 @@ def process_video_task(self, base64_data, filename):
                 "average_metrics": avg_metrics,
             }
 
-        os.unlink(tmp_path)
         return result
     except Exception as e:
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise
+    finally:
+        if analyzer is not None:
+            analyzer.close()
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
