@@ -7,9 +7,9 @@ export default function PrimaryButton({ children, onPress, icon, tone = 'ball', 
   const bgColor = disabled ? colors.line : isBall ? colors.ball : 'transparent';
   const textColor = disabled ? colors.chalkDim : isBall ? colors.ink : colors.chalk;
   const border = disabled
-    ? 'none'
+    ? null
     : isBall
-    ? 'none'
+    ? null
     : { borderWidth: 1, borderColor: colors.line };
 
   return (

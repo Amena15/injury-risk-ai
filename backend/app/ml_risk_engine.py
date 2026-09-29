@@ -19,6 +19,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any
 from warnings import warn
+import pandas as pd
 
 # Define the expected feature order (must match training)
 FEATURES = [
@@ -30,6 +31,64 @@ FEATURES = [
     'right_shoulder_angle',
     'hip_angle'
 ]
+
+def extract_enhanced_features(metrics: Dict[str, float]) -> Dict[str, float]:
+    """Extract enhanced features from basic pose metrics"""
+    enhanced = metrics.copy()
+    
+    # Calculate z-scores (use typical tennis values as baseline)
+    baseline_means = {
+        'left_elbow_angle': 141.1,
+        'right_elbow_angle': 105.9,
+        'left_knee_angle': 144.0,
+        'right_knee_angle': 120.3,
+        'left_shoulder_angle': 76.6,
+        'right_shoulder_angle': 51.2,
+        'hip_angle': 152.5
+    }
+    
+    baseline_stds = {
+        'left_elbow_angle': 46.5,
+        'right_elbow_angle': 44.3,
+        'left_knee_angle': 27.1,
+        'right_knee_angle': 37.8,
+        'left_shoulder_angle': 50.8,
+        'right_shoulder_angle': 35.9,
+        'hip_angle': 24.9
+    }
+    
+    for angle in baseline_means:
+        if angle in metrics:
+            enhanced[f'{angle}_zscore'] = (metrics[angle] - baseline_means[angle]) / baseline_stds[angle]
+            enhanced[f'{angle}_extreme'] = int((metrics[angle] < 30) | (metrics[angle] > 160))
+            
+            if 'elbow' in angle:
+                enhanced[f'{angle}_optimal'] = int((metrics[angle] >= 45) & (metrics[angle] <= 135))
+            elif 'knee' in angle:
+                enhanced[f'{angle}_optimal'] = int((metrics[angle] >= 20) & (metrics[angle] <= 150))
+            elif 'shoulder' in angle:
+                enhanced[f'{angle}_optimal'] = int((metrics[angle] >= 30) & (metrics[angle] <= 150))
+    
+    # Inter-joint coordination
+    if 'left_elbow_angle' in metrics and 'left_knee_angle' in metrics:
+        enhanced['elbow_knee_ratio'] = metrics['left_elbow_angle'] / (metrics['left_knee_angle'] + 1)
+    
+    if 'right_elbow_angle' in metrics and 'right_knee_angle' in metrics:
+        enhanced['right_elbow_knee_ratio'] = metrics['right_elbow_angle'] / (metrics['right_knee_angle'] + 1)
+    
+    # Symmetry metrics
+    if 'left_elbow_angle' in metrics and 'right_elbow_angle' in metrics:
+        enhanced['elbow_symmetry'] = abs(metrics['left_elbow_angle'] - metrics['right_elbow_angle'])
+    
+    if 'left_knee_angle' in metrics and 'right_knee_angle' in metrics:
+        enhanced['knee_symmetry'] = abs(metrics['left_knee_angle'] - metrics['right_knee_angle'])
+    
+    # Movement quality
+    optimal_cols = [col for col in enhanced if 'optimal' in col]
+    if optimal_cols:
+        enhanced['movement_quality'] = sum(enhanced[col] for col in optimal_cols) / len(optimal_cols)
+    
+    return enhanced
 
 # Map class indices to risk levels (as encoded in training)
 CLASS_MAP = {
@@ -182,9 +241,21 @@ class MLRiskEngine:
     def load_model(cls, model_path=None):
         """Load the trained model (call once at startup)."""
         if model_path is None:
-            # Default path relative to this file: backend/app/ -> backend/
+            # Try enhanced model first, then fall back to old model
             base_dir = Path(__file__).parent.parent
-            model_path = base_dir / 'risk_model.pkl'
+            enhanced_model_path = base_dir / 'models' / 'enhanced_risk_model.pkl'
+            old_model_path = base_dir / 'risk_model.pkl'
+            
+            if enhanced_model_path.exists():
+                model_path = enhanced_model_path
+                print(f"🚀 Using enhanced model: {model_path}")
+            elif old_model_path.exists():
+                model_path = old_model_path
+                print(f"📊 Using legacy model: {model_path}")
+            else:
+                print(f"⚠️ No ML model found. Rule-based engine will be used.")
+                cls._model = None
+                return False
         
         if not model_path.exists():
             print(f"⚠️ ML model not found at {model_path}. Rule-based engine will be used.")
@@ -194,19 +265,25 @@ class MLRiskEngine:
         try:
             model_data = joblib.load(model_path)
             cls._model = model_data['model']
-            cls._label_encoder = model_data['label_encoder']
-            cls._feature_columns = model_data.get('feature_columns', FEATURES)
+            cls._label_encoder = model_data.get('label_encoder')
+            cls._feature_columns = model_data.get('features', model_data.get('feature_columns', FEATURES))
+            cls._scaler = model_data.get('scaler')
+            
+            model_accuracy = model_data.get('accuracy', 'unknown')
             print(f"✅ ML model loaded from {model_path}")
+            print(f"📊 Model accuracy: {model_accuracy}")
+            print(f"🔢 Features: {len(cls._feature_columns)}")
             return True
         except Exception as exc:
             # Keep API available even if serialized artifact is incompatible.
             cls._model = None
             cls._label_encoder = None
             cls._feature_columns = FEATURES
+            cls._scaler = None
             warn(
                 f"ML model could not be loaded from {model_path}: {exc}. "
                 "Falling back to rule-based engine. "
-                "Re-train model with current dependencies via: python train_model.py"
+                "Re-train model with current dependencies via: python training/train_enhanced_model.py"
             )
             return False
 
@@ -237,8 +314,23 @@ class MLRiskEngine:
         if cls._model is None:
             raise RuntimeError("ML model not loaded. Call load_model() first.")
 
-        # Build feature vector in the correct order
-        feature_vector = np.array([[metrics.get(f, 0.0) for f in cls._feature_columns]])
+        # Extract enhanced features if using enhanced model
+        if cls._scaler is not None and len(cls._feature_columns) > 7:
+            # This is the enhanced model - need to extract enhanced features
+            enhanced_metrics = extract_enhanced_features(metrics)
+        else:
+            # Legacy model - use basic metrics
+            enhanced_metrics = metrics.copy()
+
+        # Preserve the training column names and order for the fitted scaler.
+        feature_vector = pd.DataFrame(
+            [{feature: enhanced_metrics.get(feature, 0.0) for feature in cls._feature_columns}],
+            columns=cls._feature_columns,
+        )
+        
+        # Apply scaler if available
+        if cls._scaler is not None:
+            feature_vector = cls._scaler.transform(feature_vector)
         
         # Get class probabilities
         probs = cls._model.predict_proba(feature_vector)[0]  # array of 3 probabilities
@@ -265,7 +357,7 @@ class MLRiskEngine:
         return {
             'risk_level': risk_level,
             'risk_score': risk_score,
-            'propabilities': {
+            'probabilities': {
                 'High': float(probs[0]),
                 'Low': float(probs[1]),
                 'Moderate': float(probs[2])

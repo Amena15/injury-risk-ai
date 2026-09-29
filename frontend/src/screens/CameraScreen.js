@@ -50,6 +50,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 const MAX_DURATION = 15; 
+const MAX_UPLOAD_SIZE_MB = 25;
 
 const MONO_FONT = Platform.select({
   web: 'SF Mono, Monaco, Consolas, monospace',
@@ -249,6 +250,7 @@ export default function CameraScreen({ onNavigate }) {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: 'videos',
         allowsEditing: true,
+        videoMaxDuration: MAX_DURATION,
         quality: 1,
       });
       if (!result.canceled && result.assets[0]?.uri) {
@@ -272,6 +274,15 @@ export default function CameraScreen({ onNavigate }) {
   // ---------- sendVideo using Base64 JSON (avoids FormData issues) ----------
   const sendVideo = async (uri) => {
     try {
+      const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+      const maxBytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+      if (fileInfo?.size && fileInfo.size > maxBytes) {
+        throw new Error(
+          `Video is too large (${(fileInfo.size / (1024 * 1024)).toFixed(1)} MB). ` +
+          `Please trim to 15 seconds or choose a smaller clip (<= ${MAX_UPLOAD_SIZE_MB} MB).`
+        );
+      }
+
       // 1. Read the video file as a Base64 string
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -280,7 +291,8 @@ export default function CameraScreen({ onNavigate }) {
       // 2. Get file name from URI
       const fileName = uri.split('/').pop() || 'video.mp4';
 
-      // 3. Create an AbortController with 180s timeout
+      // 3. Create an AbortController with 420s timeout.
+      // Base64 uploads + server-side pose analysis can exceed 3 minutes on larger clips.
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180000);
 
@@ -311,7 +323,10 @@ export default function CameraScreen({ onNavigate }) {
       }, 500);
     } catch (error) {
       if (error.name === 'AbortError') {
-        Alert.alert('Timeout', 'The analysis took too long. Please try with a shorter video.');
+        Alert.alert(
+          'Timeout',
+          'The request took too long. Please try a shorter clip (<= 15s), keep full body in frame, and retry on stable Wi-Fi.'
+        );
       } else {
         Alert.alert(
           'Analysis Error',

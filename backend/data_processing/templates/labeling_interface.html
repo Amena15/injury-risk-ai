@@ -1,0 +1,422 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Injury Risk Labeling Interface</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .progress-bar {
+            background: #e0e0e0;
+            border-radius: 10px;
+            padding: 3px;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 20px;
+            border-radius: 7px;
+            transition: width 0.3s ease;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .sample-display {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+        .sample-display.active {
+            display: block;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        .risk-options {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .risk-option {
+            flex: 1;
+            min-width: 120px;
+        }
+        .risk-option input[type="radio"] {
+            display: none;
+        }
+        .risk-option label {
+            display: block;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .risk-option input[type="radio"]:checked + label {
+            border-color: #667eea;
+            background: #e8eaf6;
+        }
+        .risk-option label:hover {
+            border-color: #667eea;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+        .guidelines {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .guidelines h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .sample-counter {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 18px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎾 Tennis Injury Risk Labeling Interface</h1>
+        <p class="subtitle">Expert review panel for biomechanical risk assessment</p>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ progress.progress_percentage }}%"></div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ progress.total_samples }}</div>
+                <div class="stat-label">Total Samples</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ progress.labeled_samples }}</div>
+                <div class="stat-label">Labeled Samples</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ progress.progress_percentage }}%</div>
+                <div class="stat-label">Progress</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ progress.remaining_samples }}</div>
+                <div class="stat-label">Remaining</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="createBatch('diverse')">Create Diverse Batch</button>
+            <button onclick="createBatch('high_risk')">Create High-Risk Batch</button>
+            <button onclick="getStatistics()">View Statistics</button>
+        </div>
+        
+        <div class="guidelines">
+            <h3>📋 Labeling Guidelines</h3>
+            <ul>
+                <li><strong>Safe (0)</strong>: Normal biomechanical range, no extreme angles, proper form</li>
+                <li><strong>Low Risk (1)</strong>: Slightly outside optimal range but acceptable, minor concerns</li>
+                <li><strong>Moderate Risk (2)</strong>: Clear biomechanical concerns (e.g., elbow > 160°, knee < 80°)</li>
+                <li><strong>High Risk (3)</strong>: Dangerous movement patterns (hyperextension, valgus collapse, extreme angles)</li>
+            </ul>
+        </div>
+        
+        <div id="sampleDisplay" class="sample-display">
+            <div class="sample-counter">
+                Sample <span id="currentSample">0</span> of <span id="totalSamples">0</span>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Left Elbow</div>
+                    <div class="metric-value" id="leftElbow">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Right Elbow</div>
+                    <div class="metric-value" id="rightElbow">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Left Knee</div>
+                    <div class="metric-value" id="leftKnee">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Right Knee</div>
+                    <div class="metric-value" id="rightKnee">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Left Shoulder</div>
+                    <div class="metric-value" id="leftShoulder">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Right Shoulder</div>
+                    <div class="metric-value" id="rightShoulder">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Hip Angle</div>
+                    <div class="metric-value" id="hipAngle">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Risk Score</div>
+                    <div class="metric-value" id="riskScore">--</div>
+                </div>
+            </div>
+            
+            <div class="risk-options">
+                <div class="risk-option">
+                    <input type="radio" name="riskLevel" value="Safe" id="risk0">
+                    <label for="risk0">Safe (0)</label>
+                </div>
+                <div class="risk-option">
+                    <input type="radio" name="riskLevel" value="Low Risk" id="risk1">
+                    <label for="risk1">Low Risk (1)</label>
+                </div>
+                <div class="risk-option">
+                    <input type="radio" name="riskLevel" value="Moderate Risk" id="risk2">
+                    <label for="risk2">Moderate Risk (2)</label>
+                </div>
+                <div class="risk-option">
+                    <input type="radio" name="riskLevel" value="High Risk" id="risk3">
+                    <label for="risk3">High Risk (3)</label>
+                </div>
+            </div>
+            
+            <textarea id="expertNotes" placeholder="Expert notes (optional) - describe specific concerns or observations..."></textarea>
+            
+            <div class="controls">
+                <button onclick="saveLabel()">Save Label</button>
+                <button onclick="nextSample()">Next Sample →</button>
+                <button onclick="skipSample()">Skip Sample</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentBatch = [];
+        let currentSampleIndex = 0;
+        
+        async function createBatch(strategy) {
+            const response = await fetch('/api/batch', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `batch_size=20&strategy=${strategy}`
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                currentBatch = data.samples;
+                currentSampleIndex = 0;
+                displaySample();
+                alert(`Created batch with ${data.batch_size} samples`);
+            } else {
+                alert(data.message);
+            }
+        }
+        
+        function displaySample() {
+            if (currentSampleIndex >= currentBatch.length) {
+                alert('Batch complete! Create a new batch or view statistics.');
+                document.getElementById('sampleDisplay').classList.remove('active');
+                return;
+            }
+            
+            const sample = currentBatch[currentSampleIndex];
+            
+            document.getElementById('sampleDisplay').classList.add('active');
+            document.getElementById('currentSample').textContent = currentSampleIndex + 1;
+            document.getElementById('totalSamples').textContent = currentBatch.length;
+            
+            // Display metrics
+            document.getElementById('leftElbow').textContent = sample.left_elbow_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('rightElbow').textContent = sample.right_elbow_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('leftKnee').textContent = sample.left_knee_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('rightKnee').textContent = sample.right_knee_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('leftShoulder').textContent = sample.left_shoulder_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('rightShoulder').textContent = sample.right_shoulder_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('hipAngle').textContent = sample.hip_angle?.toFixed(1) + '°' || '--';
+            document.getElementById('riskScore').textContent = sample.risk_score?.toFixed(1) || '--';
+            
+            // Clear previous selection
+            document.querySelectorAll('input[name="riskLevel"]').forEach(radio => radio.checked = false);
+            document.getElementById('expertNotes').value = '';
+        }
+        
+        async function saveLabel() {
+            const sample = currentBatch[currentSampleIndex];
+            const selectedRisk = document.querySelector('input[name="riskLevel"]:checked');
+            
+            if (!selectedRisk) {
+                alert('Please select a risk level');
+                return;
+            }
+            
+            const response = await fetch('/api/label', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    sample_id: sample.index,
+                    risk_level: selectedRisk.value,
+                    notes: document.getElementById('expertNotes').value
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                alert('Label saved successfully!');
+                nextSample();
+            } else {
+                alert('Failed to save label');
+            }
+        }
+        
+        function nextSample() {
+            currentSampleIndex++;
+            displaySample();
+        }
+        
+        function skipSample() {
+            currentSampleIndex++;
+            displaySample();
+        }
+        
+        async function getStatistics() {
+            const response = await fetch('/api/statistics');
+            const data = await response.json();
+            
+            if (data.success) {
+                let stats = 'Labeling Statistics:\n\n';
+                stats += 'Label Distribution:\n';
+                for (const [level, count] of Object.entries(data.label_distribution)) {
+                    stats += `  ${level}: ${count}\n`;
+                }
+                stats += '\nAction Distribution:\n';
+                for (const [action, count] of Object.entries(data.action_distribution)) {
+                    stats += `  ${action}: ${count}\n`;
+                }
+                stats += `\nTotal Labels: ${data.total_labels}`;
+                
+                alert(stats);
+            } else {
+                alert(data.message);
+            }
+        }
+        
+        // Load current batch on page load
+        async function loadCurrentBatch() {
+            const response = await fetch('/api/batch');
+            const data = await response.json();
+            
+            if (data.success) {
+                currentBatch = data.samples;
+                if (currentBatch.length > 0) {
+                    displaySample();
+                }
+            }
+        }
+        
+        loadCurrentBatch();
+    </script>
+</body>
+</html>
+    
