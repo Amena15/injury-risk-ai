@@ -234,6 +234,7 @@ class MLRiskEngine:
     """ML-powered risk prediction engine."""
     
     _model = None
+    _pipeline = None
     _label_encoder = None
     _feature_columns = None
 
@@ -241,12 +242,15 @@ class MLRiskEngine:
     def load_model(cls, model_path=None):
         """Load the trained model (call once at startup)."""
         if model_path is None:
-            # Try enhanced model first, then fall back to old model
             base_dir = Path(__file__).parent.parent
+            leak_free_model_path = base_dir / 'models' / 'leak_free_risk_pipeline.pkl'
             enhanced_model_path = base_dir / 'models' / 'enhanced_risk_model.pkl'
             old_model_path = base_dir / 'risk_model.pkl'
             
-            if enhanced_model_path.exists():
+            if leak_free_model_path.exists():
+                model_path = leak_free_model_path
+                print(f"🧪 Using leak-free pipeline: {model_path}")
+            elif enhanced_model_path.exists():
                 model_path = enhanced_model_path
                 print(f"🚀 Using enhanced model: {model_path}")
             elif old_model_path.exists():
@@ -257,19 +261,30 @@ class MLRiskEngine:
                 cls._model = None
                 return False
         
+        model_path = Path(model_path)
         if not model_path.exists():
             print(f"⚠️ ML model not found at {model_path}. Rule-based engine will be used.")
             cls._model = None
+            cls._pipeline = None
             return False
         
         try:
             model_data = joblib.load(model_path)
-            cls._model = model_data['model']
-            cls._label_encoder = model_data.get('label_encoder')
-            cls._feature_columns = model_data.get('features', model_data.get('feature_columns', FEATURES))
-            cls._scaler = model_data.get('scaler')
-            
-            model_accuracy = model_data.get('accuracy', 'unknown')
+            if hasattr(model_data, 'named_steps') and hasattr(model_data, 'predict_proba'):
+                cls._pipeline = model_data
+                cls._model = model_data
+                cls._label_encoder = None
+                cls._feature_columns = list(model_data.feature_names_in_)
+                cls._scaler = None
+                model_accuracy = 'not stored in pipeline'
+            else:
+                cls._pipeline = None
+                cls._model = model_data['model']
+                cls._label_encoder = model_data.get('label_encoder')
+                cls._feature_columns = model_data.get('features', model_data.get('feature_columns', FEATURES))
+                cls._scaler = model_data.get('scaler')
+                model_accuracy = model_data.get('accuracy', 'unknown')
+
             print(f"✅ ML model loaded from {model_path}")
             print(f"📊 Model accuracy: {model_accuracy}")
             print(f"🔢 Features: {len(cls._feature_columns)}")
@@ -277,6 +292,7 @@ class MLRiskEngine:
         except Exception as exc:
             # Keep API available even if serialized artifact is incompatible.
             cls._model = None
+            cls._pipeline = None
             cls._label_encoder = None
             cls._feature_columns = FEATURES
             cls._scaler = None
@@ -314,8 +330,8 @@ class MLRiskEngine:
         if cls._model is None:
             raise RuntimeError("ML model not loaded. Call load_model() first.")
 
-        # Extract enhanced features if using enhanced model
-        if cls._scaler is not None and len(cls._feature_columns) > 7:
+        # Rebuild derived training features for enhanced models and pipelines.
+        if len(cls._feature_columns) > len(FEATURES):
             # This is the enhanced model - need to extract enhanced features
             enhanced_metrics = extract_enhanced_features(metrics)
         else:
@@ -324,23 +340,20 @@ class MLRiskEngine:
 
         # Preserve the training column names and order for the fitted scaler.
         feature_vector = pd.DataFrame(
-            [{feature: enhanced_metrics.get(feature, 0.0) for feature in cls._feature_columns}],
+            [{feature: enhanced_metrics.get(feature, np.nan) for feature in cls._feature_columns}],
             columns=cls._feature_columns,
         )
-        
-        # Apply scaler if available
-        if cls._scaler is not None:
-            feature_vector = cls._scaler.transform(feature_vector)
-        
-        # Get class probabilities
-        probs = cls._model.predict_proba(feature_vector)[0]  # array of 3 probabilities
+
+        probs = cls._model.predict_proba(feature_vector)[0]
+        classes = cls._model.classes_
         pred_class = int(np.argmax(probs))
-        
-        # Decode risk level
-        if cls._label_encoder:
+
+        if cls._pipeline is not None:
+            risk_level = str(cls._model.predict(feature_vector)[0])
+        elif cls._label_encoder:
             risk_level = cls._label_encoder.inverse_transform([pred_class])[0]
         else:
-            risk_level = CLASS_MAP[pred_class]
+            risk_level = CLASS_MAP.get(pred_class, str(classes[pred_class]))
         
         # Risk score: scaled confidence of the predicted class (0-100)
         risk_score = int(round(probs[pred_class] * 100))
@@ -357,11 +370,7 @@ class MLRiskEngine:
         return {
             'risk_level': risk_level,
             'risk_score': risk_score,
-            'probabilities': {
-                'High': float(probs[0]),
-                'Low': float(probs[1]),
-                'Moderate': float(probs[2])
-            },
+            'probabilities': {str(label): float(probability) for label, probability in zip(classes, probs)},
             'flagged_joint': flagged_joint,
             'flagged_label': flagged_label,
             'primary_risk_factors': risk_factors,
