@@ -24,7 +24,10 @@ def select_samples_for_expert_labeling(
     print("🎯 Selecting most uncertain samples for expert labeling...")
     
     # Load model
-    model_path = resolve_backend_path(model_path or 'models/enhanced_risk_model.pkl')
+    if model_path is None:
+        leak_free_path = BACKEND_ROOT / 'models' / 'leak_free_risk_pipeline.pkl'
+        model_path = leak_free_path if leak_free_path.exists() else 'models/enhanced_risk_model.pkl'
+    model_path = resolve_backend_path(model_path)
     csv_path = resolve_backend_path(csv_path or 'data_processing/enhanced_tennis_dataset.csv')
 
     if not model_path.exists():
@@ -34,9 +37,15 @@ def select_samples_for_expert_labeling(
     
     print(f"✓ Loading model from: {model_path}")
     data = joblib.load(model_path)
-    model = data['model']
-    scaler = data['scaler']
-    feature_cols = data['features']
+    is_pipeline = hasattr(data, 'named_steps') and hasattr(data, 'predict_proba')
+    if is_pipeline:
+        model = data
+        scaler = None
+        feature_cols = list(data.feature_names_in_)
+    else:
+        model = data['model']
+        scaler = data['scaler']
+        feature_cols = data['features']
     
     # Load dataset
     possible_paths = [
@@ -56,12 +65,18 @@ def select_samples_for_expert_labeling(
         return
     
     # Prepare features
-    X = df[feature_cols].fillna(df[feature_cols].mean())
-    X_scaled = scaler.transform(X)
+    missing_features = [column for column in feature_cols if column not in df.columns]
+    if missing_features:
+        raise ValueError(f"Dataset is missing model features: {missing_features}")
+    X = df[feature_cols]
+    if is_pipeline:
+        prediction_input = X
+    else:
+        prediction_input = scaler.transform(X.fillna(X.mean()))
     
     # Get probability predictions
     print("\n🔮 Calculating prediction uncertainty...")
-    probabilities = model.predict_proba(X_scaled)
+    probabilities = model.predict_proba(prediction_input)
     
     # Calculate entropy (uncertainty)
     # High entropy = model is confused
